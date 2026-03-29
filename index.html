@@ -523,9 +523,22 @@
 
     var SOUNDS = {
       tick: "https://assets.mixkit.co/active_storage/sfx/2579/2579-preview.mp3",
-      chime: "https://assets.mixkit.co/active_storage/sfx/1066/1066-preview.mp3",
       complete: "https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"
     };
+
+    var transitionGongHowl = null;
+
+    function playTransitionGong(volume) {
+      var v = typeof volume === 'number' ? volume : 0.5;
+      if (!transitionGongHowl) {
+        transitionGongHowl = new Howl({
+          src: ['https://upload.wikimedia.org/wikipedia/commons/transcoded/f/fa/Gong_or_bell_vibrant.ogg/Gong_or_bell_vibrant.ogg.mp3'],
+          sprite: { strike: [0, 3600] }
+        });
+      }
+      transitionGongHowl.volume(v);
+      transitionGongHowl.play('strike');
+    }
 
     var currentExerciseIndex = 0;
     var timeLeft = 0;
@@ -536,13 +549,12 @@
     function playSound(name, volume) {
       try {
         var v = typeof volume === 'number' ? volume : 0.5;
-        var s = new Howl({ src: [SOUNDS[name]], volume: v });
-        var id = s.play();
         if (name === 'chime') {
-          setTimeout(function() {
-            if (s.playing(id)) s.fade(v, 0, 900, id);
-          }, 2600);
+          playTransitionGong(v);
+          return;
         }
+        var s = new Howl({ src: [SOUNDS[name]], volume: v });
+        s.play();
       } catch(e) {}
     }
 
