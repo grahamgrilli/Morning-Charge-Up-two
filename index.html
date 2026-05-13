@@ -515,9 +515,11 @@
     };
 
     var transitionGongHowl = null;
+    var TRANSITION_CHIME_RATE = 1.32;
+    var TRANSITION_CHIME_VOLUME = 0.5;
 
     function playTransitionGong(volume) {
-      var v = typeof volume === 'number' ? volume : 0.5;
+      var v = typeof volume === 'number' ? volume : TRANSITION_CHIME_VOLUME;
       if (!transitionGongHowl) {
         transitionGongHowl = new Howl({
           src: ['https://upload.wikimedia.org/wikipedia/commons/transcoded/f/fa/Gong_or_bell_vibrant.ogg/Gong_or_bell_vibrant.ogg.mp3'],
@@ -525,6 +527,7 @@
         });
       }
       transitionGongHowl.volume(v);
+      transitionGongHowl.rate(TRANSITION_CHIME_RATE);
       transitionGongHowl.play('strike');
     }
 
@@ -673,7 +676,7 @@
         upNext.classList.add('hidden');
       }
 
-      playSound('chime', 0.28);
+      playSound('chime', TRANSITION_CHIME_VOLUME);
 
       clearInterval(timerInterval);
       timerInterval = setInterval(function() {
