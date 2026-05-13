@@ -514,21 +514,39 @@
       complete: "https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3"
     };
 
-    var transitionGongHowl = null;
-    var TRANSITION_CHIME_RATE = 1.32;
-    var TRANSITION_CHIME_VOLUME = 0.5;
+    var audioCtx = null;
+    var TRANSITION_CHIME_VOLUME = 0.6;
 
-    function playTransitionGong(volume) {
+    function playTransitionCue(volume) {
       var v = typeof volume === 'number' ? volume : TRANSITION_CHIME_VOLUME;
-      if (!transitionGongHowl) {
-        transitionGongHowl = new Howl({
-          src: ['https://upload.wikimedia.org/wikipedia/commons/transcoded/f/fa/Gong_or_bell_vibrant.ogg/Gong_or_bell_vibrant.ogg.mp3'],
-          sprite: { strike: [0, 3600] }
-        });
+      if (typeof window.AudioContext === 'undefined' && typeof window.webkitAudioContext === 'undefined') {
+        playSound('tick', Math.min(1, v));
+        return;
       }
-      transitionGongHowl.volume(v);
-      transitionGongHowl.rate(TRANSITION_CHIME_RATE);
-      transitionGongHowl.play('strike');
+
+      if (!audioCtx) {
+        var Ctx = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new Ctx();
+      }
+
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      var now = audioCtx.currentTime;
+      var gain = audioCtx.createGain();
+      gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(0.18 * v, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+      var osc = audioCtx.createOscillator();
+      osc.connect(gain);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1240, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+      osc.start(now);
+      osc.stop(now + 0.13);
     }
 
     var currentExerciseIndex = 0;
@@ -571,7 +589,7 @@
       try {
         var v = typeof volume === 'number' ? volume : 0.5;
         if (name === 'chime') {
-          playTransitionGong(v);
+          playTransitionCue(v);
           return;
         }
         var s = new Howl({ src: [SOUNDS[name]], volume: v });
