@@ -515,7 +515,7 @@
     };
 
     var transitionGongHowl = null;
-    var TRANSITION_CHIME_RATE = 1.55;
+    var TRANSITION_CHIME_RATE = 1.65;
     var TRANSITION_CHIME_VOLUME = 0.6;
 
     function playTransitionGong(volume) {
@@ -535,6 +535,7 @@
     var timeLeft = 0;
     var timerInterval = null;
     var isPaused = false;
+    var autoPausedByVisibility = false;
     var circumference = 2 * Math.PI * 45;
     var wakeLockSentinel = null;
     var wakeLockBound = false;
@@ -569,6 +570,7 @@
 
     function playSound(name, volume) {
       try {
+        if (document.visibilityState !== 'visible') return;
         var v = typeof volume === 'number' ? volume : 0.5;
         if (name === 'chime') {
           playTransitionGong(v);
@@ -623,8 +625,27 @@
 
       document.addEventListener('visibilitychange', function() {
         if (document.visibilityState === 'visible') {
+          if (
+            autoPausedByVisibility &&
+            !document.getElementById('screen-workout').classList.contains('hidden')
+          ) {
+            isPaused = false;
+            autoPausedByVisibility = false;
+            updatePauseButton();
+            document.getElementById('paused-label').classList.add('hidden');
+          }
           syncWakeLock();
         } else {
+          if (
+            !document.getElementById('screen-workout').classList.contains('hidden') &&
+            !isPaused
+          ) {
+            isPaused = true;
+            autoPausedByVisibility = true;
+            updatePauseButton();
+            document.getElementById('paused-label').classList.remove('hidden');
+          }
+          if (transitionGongHowl) transitionGongHowl.stop();
           releaseWakeLock();
         }
       });
@@ -715,6 +736,7 @@
 
     function togglePause() {
       isPaused = !isPaused;
+      autoPausedByVisibility = false;
       updatePauseButton();
       document.getElementById('paused-label').classList.toggle('hidden', !isPaused);
       syncWakeLock();
@@ -750,6 +772,7 @@
       currentExerciseIndex = 0;
       timeLeft = 0;
       isPaused = false;
+      autoPausedByVisibility = false;
       updateWakeLockStatus();
     }
 
