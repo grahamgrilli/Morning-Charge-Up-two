@@ -517,13 +517,15 @@
     var transitionGongHowl = null;
     var TRANSITION_CHIME_RATE = 2.5;
     var TRANSITION_CHIME_VOLUME = 0.6;
+    var TRANSITION_CHIME_START_MS = 180;
+    var TRANSITION_CHIME_DURATION_MS = 3420;
 
     function playTransitionGong(volume) {
       var v = typeof volume === 'number' ? volume : TRANSITION_CHIME_VOLUME;
       if (!transitionGongHowl) {
         transitionGongHowl = new Howl({
           src: ['https://upload.wikimedia.org/wikipedia/commons/transcoded/f/fa/Gong_or_bell_vibrant.ogg/Gong_or_bell_vibrant.ogg.mp3'],
-          sprite: { strike: [0, 3600] }
+          sprite: { strike: [TRANSITION_CHIME_START_MS, TRANSITION_CHIME_DURATION_MS] }
         });
       }
       transitionGongHowl.volume(v);
