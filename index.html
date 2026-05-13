@@ -239,6 +239,30 @@
     }
     .home-btn:hover { color: white; }
 
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .wake-lock-indicator {
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--muted);
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.05);
+    }
+
+    .wake-lock-indicator.on {
+      color: white;
+      border-color: rgba(255, 0, 128, 0.7);
+      box-shadow: 0 0 14px rgba(255, 0, 128, 0.35);
+    }
+
     .home-icon {
       width: 28px;
       height: 28px;
@@ -399,9 +423,12 @@
   <div id="screen-workout" class="screen hidden" style="justify-content:flex-start;">
     <div class="workout-header">
       <div class="workout-header-title neon-gradient">MORNING CHARGE UP</div>
-      <button class="home-btn" onclick="showScreen('home')">
-        <svg class="icon home-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-      </button>
+      <div class="header-actions">
+        <div id="wake-lock-status" class="wake-lock-indicator">SCREEN LOCK: OFF</div>
+        <button class="home-btn" onclick="showScreen('home')">
+          <svg class="icon home-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </button>
+      </div>
     </div>
 
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;max-width:960px;margin:0 auto;width:100%;">
@@ -506,6 +533,36 @@
     var timerInterval = null;
     var isPaused = false;
     var circumference = 2 * Math.PI * 45;
+    var wakeLockSentinel = null;
+    var wakeLockBound = false;
+
+    function updateWakeLockStatus() {
+      var indicator = document.getElementById('wake-lock-status');
+      if (!indicator) return;
+
+      if (!('wakeLock' in navigator)) {
+        indicator.textContent = 'SCREEN LOCK: UNSUPPORTED';
+        indicator.classList.remove('on');
+        return;
+      }
+
+      var isOn = !!(wakeLockSentinel && !wakeLockSentinel.released);
+      indicator.textContent = 'SCREEN LOCK: ' + (isOn ? 'ON' : 'OFF');
+      indicator.classList.toggle('on', isOn);
+    }
+
+    function shouldKeepWakeLock() {
+      var isWorkoutVisible = !document.getElementById('screen-workout').classList.contains('hidden');
+      return isWorkoutVisible && !isPaused && timeLeft > 0;
+    }
+
+    function syncWakeLock() {
+      if (shouldKeepWakeLock()) {
+        requestWakeLock();
+      } else {
+        releaseWakeLock();
+      }
+    }
 
     function playSound(name, volume) {
       try {
@@ -526,10 +583,52 @@
       });
       document.getElementById('screen-' + name).classList.remove('hidden');
 
-      if (name === 'home') resetState();
+      if (name === 'home') {
+        releaseWakeLock();
+        resetState();
+      }
+
+      updateWakeLockStatus();
+    }
+
+    async function requestWakeLock() {
+      if (!('wakeLock' in navigator)) return;
+      if (wakeLockSentinel && !wakeLockSentinel.released) return;
+
+      try {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+        wakeLockSentinel.addEventListener('release', function() {
+          wakeLockSentinel = null;
+          updateWakeLockStatus();
+        });
+        updateWakeLockStatus();
+      } catch (e) {}
+    }
+
+    async function releaseWakeLock() {
+      if (!wakeLockSentinel) return;
+      try {
+        await wakeLockSentinel.release();
+      } catch (e) {}
+      wakeLockSentinel = null;
+      updateWakeLockStatus();
+    }
+
+    function ensureWakeLockListeners() {
+      if (wakeLockBound) return;
+      wakeLockBound = true;
+
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+          syncWakeLock();
+        } else {
+          releaseWakeLock();
+        }
+      });
     }
 
     function startCountdown() {
+      ensureWakeLockListeners();
       showScreen('countdown');
       document.getElementById('countdown-exercise-name').textContent = exercises[0].name;
       timeLeft = 5;
@@ -555,6 +654,7 @@
       isPaused = false;
 
       showScreen('workout');
+      syncWakeLock();
       updatePauseButton();
       document.getElementById('paused-label').classList.add('hidden');
 
@@ -614,6 +714,7 @@
       isPaused = !isPaused;
       updatePauseButton();
       document.getElementById('paused-label').classList.toggle('hidden', !isPaused);
+      syncWakeLock();
     }
 
     function updatePauseButton() {
@@ -624,6 +725,7 @@
 
     function completeWorkout() {
       clearInterval(timerInterval);
+      releaseWakeLock();
       showScreen('complete');
       playSound('complete');
       confetti({
@@ -641,10 +743,15 @@
 
     function resetState() {
       clearInterval(timerInterval);
+      releaseWakeLock();
       currentExerciseIndex = 0;
       timeLeft = 0;
       isPaused = false;
+      updateWakeLockStatus();
     }
+
+    ensureWakeLockListeners();
+    updateWakeLockStatus();
   </script>
 </body>
 </html>
